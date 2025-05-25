@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video.js M3U Player</title>
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <style>
+        body { font-family: sans-serif; display: flex; }
+        #video-container { flex: 2; margin-right: 20px; }
+        #playlist { flex: 1; border-left: 1px solid #ccc; padding-left: 20px; max-height: 80vh; overflow-y: auto; }
+        .playlist-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s ease;
+        }
+        .playlist-item:hover {
+            background-color: #f0f0f0;
+        }
+        .playlist-item.active {
+            background-color: #e0e0e0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="video-container">
+        <video
+            id="my-video"
+            class="video-js vjs-default-skin vjs-big-play-button"
+            controls
+            preload="auto"
+            width="640"
+            height="360"
+            data-setup="{}"
+        >
+            </video>
+    </div>
+
+    <div id="playlist">
+        <h2>Pilih Saluran</h2>
+        <p>Memuat daftar putar...</p>
+    </div>
+
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <script>
+        const player = videojs('my-video');
+        const playlistContainer = document.getElementById('playlist');
+
+        // Fungsi untuk memuat dan mem-parsing file M3U
+        async function loadM3UPlaylist(m3uUrl) {
+            try {
+                const response = await fetch(m3uUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const text = await response.text();
+                return parseM3U(text);
+            } catch (error) {
+                console.error("Gagal memuat atau mem-parsing M3U:", error);
+                playlistContainer.innerHTML = '<p style="color: red;">Gagal memuat daftar saluran.</p>';
+                return [];
+            }
+        }
+
+        // Fungsi sederhana untuk mem-parsing M3U (menyesuaikan dengan format M3U Anda)
+        // Ini adalah contoh untuk M3U sederhana, bukan HLS.
+        function parseM3U(m3uContent) {
+            const lines = m3uContent.split('\n');
+            const videos = [];
+            let currentName = 'Unknown Channel';
+
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (trimmedLine.startsWith('#EXTINF')) {
+                    // Coba ekstrak nama saluran dari EXTINF
+                    const match = trimmedLine.match(/,(.*)$/);
+                    if (match && match[1]) {
+                        currentName = match[1].trim();
+                    }
+                } else if (trimmedLine && !trimmedLine.startsWith('#')) {
+                    // Ini adalah URL video
+                    videos.push({
+                        name: currentName,
+                        url: trimmedLine
+                    });
+                    currentName = 'Unknown Channel'; // Reset untuk entri berikutnya
+                }
+            }
+            return videos;
+        }
+
+        // Fungsi untuk membangun daftar putar di UI
+        function buildPlaylistUI(videos) {
+            playlistContainer.innerHTML = '<h2>Pilih Saluran</h2>'; // Bersihkan konten lama
+            videos.forEach((video, index) => {
+                const item = document.createElement('div');
+                item.classList.add('playlist-item');
+                item.textContent = video.name;
+                item.dataset.url = video.url; // Simpan URL di data attribute
+
+                item.addEventListener('click', () => {
+                    // Hapus kelas 'active' dari semua item
+                    document.querySelectorAll('.playlist-item').forEach(el => el.classList.remove('active'));
+                    // Tambahkan kelas 'active' ke item yang diklik
+                    item.classList.add('active');
+
+                    player.src({
+                        src: video.url,
+                        type: guessMimeType(video.url) // Tebak tipe MIME
+                    });
+                    player.load();
+                    player.play();
+                });
+                playlistContainer.appendChild(item);
+            });
+
+            // Otomatis putar video pertama jika ada
+            if (videos.length > 0) {
+                // Simulasikan klik pada item pertama untuk memutar secara otomatis
+                const firstItem = document.querySelector('.playlist-item');
+                if (firstItem) {
+                    firstItem.click();
+                }
+            }
+        }
+
+        // Fungsi sederhana untuk menebak tipe MIME berdasarkan ekstensi file
+        function guessMimeType(url) {
+            if (url.endsWith('.m3u8')) return 'application/x-mpegURL'; // Untuk HLS
+            if (url.endsWith('.mpd')) return 'application/dash+xml'; // Untuk MPEG-DASH
+            if (url.endsWith('.mp4')) return 'video/mp4';
+            if (url.endsWith('.webm')) return 'video/webm';
+            if (url.endsWith('.ogg')) return 'video/ogg';
+            // Tambahkan tipe lain sesuai kebutuhan
+            return ''; // Biarkan Video.js menebak jika tidak yakin
+        }
+
+        // Muat daftar putar saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', () => {
+            const m3uFileUrl = 'playlist.m3u'; // Ganti dengan path ke file M3U Anda
+            loadM3UPlaylist(m3uFileUrl).then(videos => {
+                if (videos.length > 0) {
+                    buildPlaylistUI(videos);
+                } else {
+                    playlistContainer.innerHTML = '<p>Tidak ada saluran ditemukan di daftar putar.</p>';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
