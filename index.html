@@ -1,151 +1,204 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-    <title>Video.js M3U Player</title>
-    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
-    <style>
-        body { font-family: sans-serif; display: flex; }
-        #video-container { flex: 2; margin-right: 20px; }
-        #playlist { flex: 1; border-left: 1px solid #ccc; padding-left: 20px; max-height: 80vh; overflow-y: auto; }
-        .playlist-item {
-            padding: 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-            transition: background-color 0.2s ease;
-        }
-        .playlist-item:hover {
-            background-color: #f0f0f0;
-        }
-        .playlist-item.active {
-            background-color: #e0e0e0;
-            font-weight: bold;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>free Torrent Downloader</title>
+  <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+  <style>
+    body {
+      background: #fff;
+      color: #111;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    .container {
+      max-width: 430px;
+      width: 96%;
+      margin-top: 50px;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 4px 32px 0 #0002;
+      padding: 32px 22px 30px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    h1 {
+      margin: 0 0 12px 0;
+      text-align: center;
+      font-size: 1.4em;
+      font-weight: 600;
+    }
+    input[type="text"], input[type="file"] {
+      padding: 10px;
+      font-size: 1em;
+      border: 1.5px solid #bbb;
+      border-radius: 7px;
+      margin-bottom: 6px;
+      width: 100%;
+      box-sizing: border-box;
+      background: #fff;
+      color: #111;
+    }
+    label {
+      font-size: 1em;
+      margin-bottom: 4px;
+      display: block;
+    }
+    button {
+      background: #ffe14e;
+      color: #222;
+      font-size: 1.09em;
+      border: none;
+      border-radius: 7px;
+      padding: 12px 0;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background 0.18s;
+    }
+    button:active { background: #ffd600; }
+    .progress-bar-bg {
+      width: 100%;
+      background: #eee;
+      height: 24px;
+      border-radius: 12px;
+      margin-top: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px #0001;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0;
+      background: #18e26e;
+      transition: width 0.2s;
+      border-radius: inherit;
+      text-align: right;
+      font-weight: 600;
+      color: #222;
+      line-height: 24px;
+      padding-right: 9px;
+      font-size: 0.98em;
+      box-sizing: border-box;
+    }
+    .file-list {
+      margin-top: 16px;
+      font-size: 1em;
+      color: #111;
+      word-break: break-word;
+    }
+    .file-link {
+      display: block;
+      margin-top: 7px;
+      color: #297a38;
+      text-decoration: underline;
+      font-weight: 500;
+      font-size: 0.98em;
+      word-break: break-all;
+    }
+    @media (max-width: 600px) {
+      .container { margin-top: 16px; padding: 16px 6px 18px 6px;}
+      h1 { font-size: 1.1em;}
+      .progress-bar-bg { height: 17px;}
+      .progress-bar { line-height: 17px; font-size: 0.90em; padding-right: 4px;}
+    }
+  </style>
 </head>
 <body>
-    <div id="video-container">
-        <video
-            id="my-video"
-            class="video-js vjs-default-skin vjs-big-play-button"
-            controls
-            preload="auto"
-            width="640"
-            height="360"
-            data-setup="{}"
-        >
-            </video>
+  <div class="container">
+    <h1>WebTorrent Downloader</h1>
+    <label for="magnet">Magnet Link</label>
+    <input type="text" id="magnet" placeholder="Paste magnet link di sini..." autocomplete="off">
+    <div style="text-align:center; font-size:0.95em; color:#888;">atau</div>
+    <label for="torrentFile">Pilih File Torrent</label>
+    <input type="file" id="torrentFile" accept=".torrent">
+    <button id="downloadBtn">Download</button>
+    <div class="progress-bar-bg" style="display:none;">
+      <div class="progress-bar" id="progressBar">0%</div>
     </div>
+    <div class="file-list" id="fileList"></div>
+  </div>
+  <script>
+    const client = new WebTorrent();
+    const downloadBtn = document.getElementById('downloadBtn');
+    const magnetInput = document.getElementById('magnet');
+    const torrentFileInput = document.getElementById('torrentFile');
+    const progressBarBg = document.querySelector('.progress-bar-bg');
+    const progressBar = document.getElementById('progressBar');
+    const fileList = document.getElementById('fileList');
 
-    <div id="playlist">
-        <h2>Pilih Saluran</h2>
-        <p>Memuat daftar putar...</p>
-    </div>
+    let currentTorrent = null;
 
-    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-    <script>
-        const player = videojs('my-video');
-        const playlistContainer = document.getElementById('playlist');
+    downloadBtn.onclick = function() {
+      let magnet = magnetInput.value.trim();
+      let torrentFile = torrentFileInput.files[0];
 
-        // Fungsi untuk memuat dan mem-parsing file M3U
-        async function loadM3UPlaylist(m3uUrl) {
-            try {
-                const response = await fetch(m3uUrl);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const text = await response.text();
-                return parseM3U(text);
-            } catch (error) {
-                console.error("Gagal memuat atau mem-parsing M3U:", error);
-                playlistContainer.innerHTML = '<p style="color: red;">Gagal memuat daftar saluran.</p>';
-                return [];
-            }
+      fileList.innerHTML = '';
+      progressBarBg.style.display = 'none';
+      progressBar.style.width = '0%';
+      progressBar.textContent = '0%';
+
+      if (currentTorrent) {
+        currentTorrent.destroy();
+        currentTorrent = null;
+      }
+
+      if (magnet) {
+        startTorrent(magnet);
+      } else if (torrentFile) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          startTorrent(new Uint8Array(e.target.result));
         }
+        reader.readAsArrayBuffer(torrentFile);
+      } else {
+        alert('Masukkan magnet link atau pilih file torrent!');
+      }
+    };
 
-        // Fungsi sederhana untuk mem-parsing M3U (menyesuaikan dengan format M3U Anda)
-        // Ini adalah contoh untuk M3U sederhana, bukan HLS.
-        function parseM3U(m3uContent) {
-            const lines = m3uContent.split('\n');
-            const videos = [];
-            let currentName = 'Unknown Channel';
+    function startTorrent(torrentId) {
+      client.add(torrentId, function(torrent) {
+        currentTorrent = torrent;
+        progressBarBg.style.display = 'block';
 
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine.startsWith('#EXTINF')) {
-                    // Coba ekstrak nama saluran dari EXTINF
-                    const match = trimmedLine.match(/,(.*)$/);
-                    if (match && match[1]) {
-                        currentName = match[1].trim();
-                    }
-                } else if (trimmedLine && !trimmedLine.startsWith('#')) {
-                    // Ini adalah URL video
-                    videos.push({
-                        name: currentName,
-                        url: trimmedLine
-                    });
-                    currentName = 'Unknown Channel'; // Reset untuk entri berikutnya
-                }
-            }
-            return videos;
-        }
-
-        // Fungsi untuk membangun daftar putar di UI
-        function buildPlaylistUI(videos) {
-            playlistContainer.innerHTML = '<h2>Pilih Saluran</h2>'; // Bersihkan konten lama
-            videos.forEach((video, index) => {
-                const item = document.createElement('div');
-                item.classList.add('playlist-item');
-                item.textContent = video.name;
-                item.dataset.url = video.url; // Simpan URL di data attribute
-
-                item.addEventListener('click', () => {
-                    // Hapus kelas 'active' dari semua item
-                    document.querySelectorAll('.playlist-item').forEach(el => el.classList.remove('active'));
-                    // Tambahkan kelas 'active' ke item yang diklik
-                    item.classList.add('active');
-
-                    player.src({
-                        src: video.url,
-                        type: guessMimeType(video.url) // Tebak tipe MIME
-                    });
-                    player.load();
-                    player.play();
-                });
-                playlistContainer.appendChild(item);
-            });
-
-            // Otomatis putar video pertama jika ada
-            if (videos.length > 0) {
-                // Simulasikan klik pada item pertama untuk memutar secara otomatis
-                const firstItem = document.querySelector('.playlist-item');
-                if (firstItem) {
-                    firstItem.click();
-                }
-            }
-        }
-
-        // Fungsi sederhana untuk menebak tipe MIME berdasarkan ekstensi file
-        function guessMimeType(url) {
-            if (url.endsWith('.m3u8')) return 'application/x-mpegURL'; // Untuk HLS
-            if (url.endsWith('.mpd')) return 'application/dash+xml'; // Untuk MPEG-DASH
-            if (url.endsWith('.mp4')) return 'video/mp4';
-            if (url.endsWith('.webm')) return 'video/webm';
-            if (url.endsWith('.ogg')) return 'video/ogg';
-            // Tambahkan tipe lain sesuai kebutuhan
-            return ''; // Biarkan Video.js menebak jika tidak yakin
-        }
-
-        // Muat daftar putar saat halaman dimuat
-        document.addEventListener('DOMContentLoaded', () => {
-            const m3uFileUrl = 'playlist.m3u'; // Ganti dengan path ke file M3U Anda
-            loadM3UPlaylist(m3uFileUrl).then(videos => {
-                if (videos.length > 0) {
-                    buildPlaylistUI(videos);
-                } else {
-                    playlistContainer.innerHTML = '<p>Tidak ada saluran ditemukan di daftar putar.</p>';
-                }
-            });
+        torrent.on('download', updateProgress);
+        torrent.on('done', function() {
+          updateProgress();
+          progressBar.textContent = 'Selesai!';
         });
-    </script>
+
+        // Tampilkan daftar file
+        let html = '<b>File yang bisa didownload:</b><br>';
+        torrent.files.forEach(function(file) {
+          file.getBlobURL(function(err, url) {
+            if (err) return;
+            // Tambah tombol download untuk setiap file
+            html += `<a class="file-link" href="${url}" download="${file.name}">${file.name} (${formatBytes(file.length)})</a>`;
+            fileList.innerHTML = html;
+          });
+        });
+      });
+    }
+
+    function updateProgress() {
+      if (!currentTorrent) return;
+      let percent = (currentTorrent.progress * 100).toFixed(1);
+      progressBar.style.width = percent + '%';
+      progressBar.textContent = percent + '%';
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      let k = 1024, sizes = ['KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(bytes) / Math.log(k));
+      return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+    }
+  </script>
 </body>
 </html>
